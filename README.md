@@ -19,6 +19,9 @@ The workflow creates the new marker, retires every previous marker, updates
 this README and commits/pushes the result. No image editing, source editing or
 manual file upload is needed.
 
+`Dry run` is only for maintainers who want to test the workflow: leave it off
+for a real release. It validates the transition but deliberately does not push.
+
 The same number must be placed in `QOL_UPDATE_MARKER` in QOLLOCK before that
 build is packed. The build's first Settings open then checks exactly its own
 `markers/<number>.png`: a square image means current; a wide image means an
