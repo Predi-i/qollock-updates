@@ -43,9 +43,10 @@ from GitHub. The game classifies only two intentional shapes:
 Keep this repository public. Making it private prevents `raw.githubusercontent.com`
 from serving the marker to players who do not have GitHub credentials.
 
-## One-time setup note
+## Permissions
 
-The publish workflow needs **Settings → Actions → General → Workflow permissions**
-set to **Read and write permissions**. That is already the only permission it
-needs: it can update this repository, but cannot access the private QOLLOCK
-repository.
+This repository is already configured with the `GITHUB_TOKEN` write permission
+needed by the publish workflow. If the workflow is copied into a fork, set
+**Settings → Actions → General → Workflow permissions** to **Read and write
+permissions**. It can update this public repository only; it cannot access the
+private QOLLOCK repository.
