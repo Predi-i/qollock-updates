@@ -2,8 +2,8 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline';">
-    <title>QOL_BRIDGE_READY</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; worker-src 'self';">
+    <title>QOL_BRIDGE_INIT</title>
 </head>
 <body>
 <script>
@@ -13,6 +13,20 @@
     if (window.top !== window.self) {
         try { window.top.location = window.self.location; } catch (_) {}
         return;
+    }
+
+    // Verify localStorage availability before declaring bridge ready
+    try {
+        var _probeKey = '__qol_probe__';
+        localStorage.setItem(_probeKey, '1');
+        localStorage.removeItem(_probeKey);
+    } catch (eStorage) {
+        document.title = 'QOL_BRIDGE_ERROR:' + (eStorage && eStorage.message ? eStorage.message : eStorage);
+        return;
+    }
+
+    if ('serviceWorker' in navigator) {
+        try { navigator.serviceWorker.register('./sw.js').catch(function() {}); } catch (_) {}
     }
 
     var CHUNK_SIZE = 1500;
