@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>QOL_BRIDGE_READY</title>
+</head>
+<body>
+<script>
+(function() {
+    'use strict';
+
+    function send(id, ok, data, err) {
+        var resp = { id: id, ok: !!ok };
+        if (data !== undefined) resp.data = data;
+        if (err) resp.error = String(err);
+        document.title = 'QOL_RES:' + JSON.stringify(resp);
+    }
+
+    window.__qolSave = function(key, val, id) {
+        try {
+            localStorage.setItem(key, val);
+            send(id, true);
+        } catch (e) {
+            send(id, false, undefined, e && e.message ? e.message : e);
+        }
+    };
+
+    window.__qolLoad = function(key, id) {
+        try {
+            var val = localStorage.getItem(key);
+            send(id, true, val);
+        } catch (e) {
+            send(id, false, undefined, e && e.message ? e.message : e);
+        }
+    };
+
+    window.__qolRemove = function(key, id) {
+        try {
+            localStorage.removeItem(key);
+            send(id, true);
+        } catch (e) {
+            send(id, false, undefined, e && e.message ? e.message : e);
+        }
+    };
+
+    document.title = 'QOL_BRIDGE_READY';
+})();
+</script>
+</body>
+</html>
