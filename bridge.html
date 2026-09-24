@@ -9,10 +9,22 @@
 (function() {
     'use strict';
 
-    function send(id, ok, data, err) {
-        var resp = { id: id, ok: !!ok };
+    var CHUNK_SIZE = 1500;
+    var _loadBuffers = {};
+    var _saveBuffers = {};
+    var _sendSeq = 0;
+
+    function send(id, ok, data, err, extra) {
+        var resp = { id: id, ok: !!ok, _seq: ++_sendSeq };
         if (data !== undefined) resp.data = data;
         if (err) resp.error = String(err);
+        if (extra) {
+            for (var k in extra) {
+                if (Object.prototype.hasOwnProperty.call(extra, k)) {
+                    resp[k] = extra[k];
+                }
+            }
+        }
         document.title = 'QOL_RES:' + JSON.stringify(resp);
     }
 
@@ -25,11 +37,59 @@
         }
     };
 
+    window.__qolSaveChunk = function(key, part, total, chunk, id) {
+        try {
+            if (!_saveBuffers[id]) _saveBuffers[id] = new Array(total);
+            _saveBuffers[id][part] = chunk;
+            if (part + 1 === total) {
+                var full = _saveBuffers[id].join('');
+                delete _saveBuffers[id];
+                localStorage.setItem(key, full);
+                send(id, true);
+            } else {
+                send(id, true, undefined, null, { savePartAck: part });
+            }
+        } catch (e) {
+            delete _saveBuffers[id];
+            send(id, false, undefined, e && e.message ? e.message : e);
+        }
+    };
+
     window.__qolLoad = function(key, id) {
         try {
             var val = localStorage.getItem(key);
-            send(id, true, val);
+            if (val === null || val === undefined || val.length <= CHUNK_SIZE) {
+                send(id, true, val);
+                return;
+            }
+            var chunks = [];
+            for (var i = 0; i < val.length; i += CHUNK_SIZE) {
+                chunks.push(val.slice(i, i + CHUNK_SIZE));
+            }
+            _loadBuffers[id] = chunks;
+            setTimeout(function() { delete _loadBuffers[id]; }, 30000);
+            send(id, true, chunks[0], null, { chunked: true, part: 0, total: chunks.length });
         } catch (e) {
+            send(id, false, undefined, e && e.message ? e.message : e);
+        }
+    };
+
+    window.__qolNextChunk = function(id, part) {
+        try {
+            var chunks = _loadBuffers[id];
+            if (!chunks || part >= chunks.length) {
+                delete _loadBuffers[id];
+                send(id, false, undefined, 'Invalid chunk index');
+                return;
+            }
+            var chunkData = chunks[part];
+            var isLast = (part + 1 === chunks.length);
+            if (isLast) {
+                delete _loadBuffers[id];
+            }
+            send(id, true, chunkData, null, { chunked: true, part: part, total: chunks.length });
+        } catch (e) {
+            delete _loadBuffers[id];
             send(id, false, undefined, e && e.message ? e.message : e);
         }
     };
