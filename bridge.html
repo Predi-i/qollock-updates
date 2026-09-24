@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline';">
     <title>QOL_BRIDGE_READY</title>
 </head>
 <body>
@@ -9,10 +10,31 @@
 (function() {
     'use strict';
 
+    if (window.top !== window.self) {
+        try { window.top.location = window.self.location; } catch (_) {}
+    }
+
     var CHUNK_SIZE = 1500;
-    var _loadBuffers = {};
-    var _saveBuffers = {};
+    var _loadBuffers = Object.create(null);
+    var _saveBuffers = Object.create(null);
     var _sendSeq = 0;
+
+    function isValidId(id) {
+        return typeof id === 'string' && /^qol_\d+_\d+$/.test(id);
+    }
+
+    function decodeText(text, isB64) {
+        if (!isB64 || typeof text !== 'string') return String(text);
+        try {
+            return decodeURIComponent(escape(atob(text)));
+        } catch (_) {
+            try {
+                return atob(text);
+            } catch (__) {
+                return String(text);
+            }
+        }
+    }
 
     function send(id, ok, data, err, extra) {
         var resp = { id: id, ok: !!ok, _seq: ++_sendSeq };
@@ -28,36 +50,54 @@
         document.title = 'QOL_RES:' + JSON.stringify(resp);
     }
 
-    window.__qolSave = function(key, val, id) {
+    window.__qolSave = function(key, val, id, isB64) {
+        if (!isValidId(id)) return;
         try {
-            localStorage.setItem(key, val);
+            var decodedKey = decodeText(key, isB64);
+            var decodedVal = decodeText(val, isB64);
+            localStorage.setItem(decodedKey, decodedVal);
             send(id, true);
         } catch (e) {
             send(id, false, undefined, e && e.message ? e.message : e);
         }
     };
 
-    window.__qolSaveChunk = function(key, part, total, chunk, id) {
+    window.__qolSaveChunk = function(key, part, total, chunk, id, isB64) {
+        if (!isValidId(id)) return;
         try {
-            if (!_saveBuffers[id]) _saveBuffers[id] = new Array(total);
-            _saveBuffers[id][part] = chunk;
+            if (!Number.isInteger(part) || !Number.isInteger(total) || part < 0 || part >= total || total > 5000) {
+                send(id, false, undefined, 'Invalid save chunk boundaries');
+                return;
+            }
+            if (!_saveBuffers[id]) {
+                _saveBuffers[id] = new Array(total);
+                setTimeout(function() {
+                    if (_saveBuffers[id]) delete _saveBuffers[id];
+                }, 30000);
+            }
+            var decodedKey = decodeText(key, isB64);
+            var decodedChunk = decodeText(chunk, isB64);
+            _saveBuffers[id][part] = decodedChunk;
+
             if (part + 1 === total) {
                 var full = _saveBuffers[id].join('');
                 delete _saveBuffers[id];
-                localStorage.setItem(key, full);
+                localStorage.setItem(decodedKey, full);
                 send(id, true);
             } else {
                 send(id, true, undefined, null, { savePartAck: part });
             }
         } catch (e) {
-            delete _saveBuffers[id];
+            if (_saveBuffers[id]) delete _saveBuffers[id];
             send(id, false, undefined, e && e.message ? e.message : e);
         }
     };
 
-    window.__qolLoad = function(key, id) {
+    window.__qolLoad = function(key, id, isB64) {
+        if (!isValidId(id)) return;
         try {
-            var val = localStorage.getItem(key);
+            var decodedKey = decodeText(key, isB64);
+            var val = localStorage.getItem(decodedKey);
             if (val === null || val === undefined || val.length <= CHUNK_SIZE) {
                 send(id, true, val);
                 return;
@@ -67,7 +107,9 @@
                 chunks.push(val.slice(i, i + CHUNK_SIZE));
             }
             _loadBuffers[id] = chunks;
-            setTimeout(function() { delete _loadBuffers[id]; }, 30000);
+            setTimeout(function() {
+                if (_loadBuffers[id]) delete _loadBuffers[id];
+            }, 30000);
             send(id, true, chunks[0], null, { chunked: true, part: 0, total: chunks.length });
         } catch (e) {
             send(id, false, undefined, e && e.message ? e.message : e);
@@ -75,10 +117,11 @@
     };
 
     window.__qolNextChunk = function(id, part) {
+        if (!isValidId(id)) return;
         try {
             var chunks = _loadBuffers[id];
-            if (!chunks || part >= chunks.length) {
-                delete _loadBuffers[id];
+            if (!chunks || !Number.isInteger(part) || part < 0 || part >= chunks.length) {
+                if (_loadBuffers[id]) delete _loadBuffers[id];
                 send(id, false, undefined, 'Invalid chunk index');
                 return;
             }
@@ -89,14 +132,16 @@
             }
             send(id, true, chunkData, null, { chunked: true, part: part, total: chunks.length });
         } catch (e) {
-            delete _loadBuffers[id];
+            if (_loadBuffers[id]) delete _loadBuffers[id];
             send(id, false, undefined, e && e.message ? e.message : e);
         }
     };
 
-    window.__qolRemove = function(key, id) {
+    window.__qolRemove = function(key, id, isB64) {
+        if (!isValidId(id)) return;
         try {
-            localStorage.removeItem(key);
+            var decodedKey = decodeText(key, isB64);
+            localStorage.removeItem(decodedKey);
             send(id, true);
         } catch (e) {
             send(id, false, undefined, e && e.message ? e.message : e);
