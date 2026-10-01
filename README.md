@@ -29,7 +29,7 @@ update is available.
 
 ## Current release marker
 
-<!-- current-marker:start -->5<!-- current-marker:end -->
+<!-- current-marker:start -->6<!-- current-marker:end -->
 
 ## How it works
 
