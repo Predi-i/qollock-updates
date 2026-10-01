@@ -163,7 +163,41 @@
         }
     };
 
-    document.title = 'QOL_BRIDGE_READY';
+    // Deadlock's 2026-10-01 update lets CitadelHTMLPanel.SetURL load only
+    // https:// URLs, so `javascript:` calls no longer reach this page.
+    // QOLLOCK now sends each call as
+    //   #<encodeURIComponent(JSON.stringify({ q: uniqueId, f: name, a: args }))>
+    // The fragment is never sent to the server, and changing it fires
+    // `hashchange` without reloading the page. A fragment present when the
+    // page first loads is ignored so a reload never replays an old request.
+    var FRAGMENT_HANDLERS = {
+        save: window.__qolSave,
+        saveChunk: window.__qolSaveChunk,
+        load: window.__qolLoad,
+        next: window.__qolNextChunk,
+        remove: window.__qolRemove
+    };
+    var _lastFragmentId = '';
+
+    function onFragment() {
+        var hash = location.hash;
+        if (!hash || hash.length < 2) return;
+        var msg;
+        try {
+            msg = JSON.parse(decodeURIComponent(hash.slice(1)));
+        } catch (_) {
+            return;
+        }
+        if (!msg || typeof msg.q !== 'string' || msg.q === _lastFragmentId) return;
+        if (!Object.prototype.hasOwnProperty.call(FRAGMENT_HANDLERS, msg.f) || !Array.isArray(msg.a)) return;
+        _lastFragmentId = msg.q;
+        FRAGMENT_HANDLERS[msg.f].apply(null, msg.a);
+    }
+
+    window.addEventListener('hashchange', onFragment);
+
+    // ":frag1" tells QOLLOCK this page accepts fragment requests.
+    document.title = 'QOL_BRIDGE_READY:frag1';
 })();
 </script>
 </body>
