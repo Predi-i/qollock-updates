@@ -50,3 +50,22 @@ needed by the publish workflow. If the workflow is copied into a fork, set
 **Settings → Actions → General → Workflow permissions** to **Read and write
 permissions**. It can update this public repository only; it cannot access the
 private QOLLOCK repository.
+
+## Storage bridge maintenance
+
+`bridge.html` stores origin-local player settings through fragment requests.
+Run `node --test tools/bridge.test.cjs` and `python tools/test_markers.py` before
+changing it. Keep QOLLOCK's hosted-page fixture synchronized with this file.
+Every page change must rotate the internal cache name in `sw.js`; this does not
+change the mod release marker.
+
+Multipart saves must begin at part zero and retain their key, total and order.
+Only a complete transfer replaces the stored value. Thirty seconds without
+progress expires a save; an expired transfer must start again from part zero.
+
+Write tokens protect updated page handlers only. A previously opened untokened
+document can still modify storage even after another document has locked it.
+Activating a new service worker does not replace that running script. Deployment
+verification needs an old-page reload/full-client restart scenario, as well as
+the updated mod and page. Older clients cannot write through an updated page
+after a token-aware client locks storage.
