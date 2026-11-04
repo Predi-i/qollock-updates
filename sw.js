@@ -1,5 +1,7 @@
 // Service worker for offline caching of QOLLOCK storage bridge
-const CACHE_NAME = 'qol-bridge-v2';
+// Bump with every bridge.html change: the cache-first fetch below otherwise
+// keeps serving the old page to installed players.
+const CACHE_NAME = 'qol-bridge-v3';
 const ASSETS = ['./bridge.html'];
 
 self.addEventListener('install', function(event) {
